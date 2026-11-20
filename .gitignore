@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Generated data and model binaries (anyone can rebuild them with make)
+data/
+artifacts/
+*.joblib
+*.pkl
+*.pickle
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets: never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

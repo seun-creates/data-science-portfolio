@@ -1,0 +1,38 @@
+[project]
+name = "data-science-portfolio"
+version = "1.0.0"
+description = "Five tested projects: data cleaning, ETL/SQL, classification, forecasting, model serving."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+# Each project is its own package; put every project folder on the import path.
+pythonpath = [
+    "projects/01-data-cleaning",
+    "projects/02-sales-etl",
+    "projects/03-churn-model",
+    "projects/04-demand-forecasting",
+    "projects/05-churn-api",
+]
+testpaths = ["projects"]
+addopts = "-ra --strict-markers --import-mode=importlib"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["data", "artifacts"]
+
+[tool.ruff.lint]
+# E/F/W: errors, I: import order, B: bug patterns, UP: modern syntax,
+# S: security (bandit rules), SIM: simplifications, NPY: numpy, RUF: ruff extras
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "NPY", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest works; random data in tests is not a security issue
+"**/tests/**" = ["S101", "S311"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true
