@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: jobs can read the repository and nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: make lint
+      - run: make typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Tests with coverage
+        run: >
+          python -m pytest
+          --cov=cleaning --cov=etl --cov=churn --cov=forecasting --cov=churn_api --cov=healthchurn --cov=health_api
+          --cov-report=term-missing
+
+  pipelines:
+    # Run every project end to end, exactly as a reviewer would.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: make cleaning etl churn forecast health-churn
+
+  docker:
+    # Build the API image and smoke-test the running container.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: docker build -f projects/05-churn-api/Dockerfile -t churn-api:ci .
+      - name: Smoke test
+        run: |
+          KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+          docker run -d --name api -p 127.0.0.1:8000:8000 -e CHURN_API_KEY="$KEY" \
+            --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+            churn-api:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8000/v1/predict \
+            -H 'Content-Type: application/json' -d '{"customers":[]}')" = "401"
+          curl -fs -X POST http://127.0.0.1:8000/v1/predict \
+            -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
+            -d '{"customers":[{"tenure_months":3,"monthly_charges":89.5,"support_tickets_90d":4,
+                 "num_products":1,"senior_citizen":0,"paperless_billing":1,
+                 "contract":"month-to-month","internet_service":"fiber"}]}'
+      - if: always()
+        run: docker logs api || true
+
+  docker-health:
+    # Same smoke test for the health-plan API, plus a check that PHI is refused.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: docker build -f projects/07-health-api/Dockerfile -t health-api:ci .
+      - name: Smoke test
+        run: |
+          KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+          docker run -d --name api -p 127.0.0.1:8001:8000 -e HEALTH_API_KEY="$KEY" \
+            --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+            health-api:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8001/health && break; sleep 1; done
+          MEMBER='{"age_band":"26-34","tenure_months":8,"plan_type":"HMO","metal_tier":"silver",
+            "enrollment_channel":"exchange","subsidy_eligible":1,"monthly_premium":455.0,
+            "premium_change_pct":14.0,"deductible_met_pct":0.1,"out_of_pocket_ytd":350.0,
+            "denied_claims_12m":3,"appeals_grievances_12m":1,"member_service_calls_90d":4,
+            "has_assigned_pcp":1,"pcp_left_network":1,"out_of_network_visits_12m":1,
+            "portal_logins_90d":0'
+          curl -fs -X POST http://127.0.0.1:8001/v1/score \
+            -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
+            -d "{\"members\":[$MEMBER}]}"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8001/v1/score \
+            -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
+            -d "{\"members\":[$MEMBER,\"member_ref\":\"123-45-6789\"}]}")" = "422"
+      - if: always()
+        run: docker logs api || true
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # full history, so secret scanning covers every commit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Bandit (static security analysis)
+        run: bandit -q -r projects -x "*/tests/*"
+      - name: pip-audit (known-vulnerable dependencies)
+        run: pip-audit -r requirements.txt
+      - name: Gitleaks (secret scanning)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
