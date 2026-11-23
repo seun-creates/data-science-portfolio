@@ -8,11 +8,11 @@ with SQL window functions.
 ```
 *orders.jsonl
 **extract (size cap, JSON parse)
-***alidate (pydantic data contract)
+***validate (pydantic data contract)
 *****load (one transaction, parameterized SQL)
-****** dim_customer, dim_product        (upserts)
-******* fact_order, fact_order_item      (insert-once)
-******** etl_run, etl_reject              (audit trail)
+****** dim_customer, dim_product (upserts)
+******* fact_order, fact_order_item (insert-once)
+******** etl_run, etl_reject (audit trail)
 ********* analytics.sql (window functions)
 ```
 
