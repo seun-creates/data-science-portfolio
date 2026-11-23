@@ -6,10 +6,10 @@ with SQL window functions.
 
 ## Architecture
 ```
-*orders.jsonl
-**extract (size cap, JSON parse)
-***validate (pydantic data contract)
-*****load (one transaction, parameterized SQL)
+* orders.jsonl
+** extract (size cap, JSON parse)
+*** validate (pydantic data contract)
+***** load (one transaction, parameterized SQL)
 ****** dim_customer, dim_product (upserts)
 ******* fact_order, fact_order_item (insert-once)
 ******** etl_run, etl_reject (audit trail)
