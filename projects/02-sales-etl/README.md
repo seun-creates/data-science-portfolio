@@ -17,11 +17,11 @@ with SQL window functions.
 ```
 
 ## Design decisions
-- **Data contract:**
-- **Idempotent:**
-- **Atomic:**
-- **Exact money:**
-- **Secure SQL:**
+- **Data contract**
+- **Idempotent**
+- **Atomic**
+- **Exact money**
+- **Secure SQL**
 
 ## Results (seed 7)
 | Metric | Value |
