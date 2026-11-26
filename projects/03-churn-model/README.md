@@ -20,7 +20,7 @@ Expected campaign value [**+$15,900**] vs. [**−$9,020**] for contacting everyo
 
 The simpler model won. Gradient boosting didn't earn its extra complexity here, so the interpretable logistic regression is the one that ships.
 
-![Graphs](../../docs/churn)
+[Graphs][data-science-portfolio/projects/03-churn-model/docs/churn]
 
 ## Model card
 | | |
