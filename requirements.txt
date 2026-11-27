@@ -1,9 +1,9 @@
 # Runtime dependencies (used by CI and Docker). Keep in sync with environment.yml.
-pandas>=2.2,<4
-numpy>=1.26,<3
-scikit-learn>=1.5,<2
-matplotlib>=3.8,<4
-joblib>=1.4
-pydantic>=2.7,<3
-fastapi>=0.115,<1
-uvicorn>=0.30
+pandas>=3.1.1,<4
+numpy>=2.4.6,<3
+scikit-learn>=1.9.1,<2
+matplotlib>=3.11.2,<4
+joblib>=1.6.0
+pydantic>=2.14.4,<3
+fastapi>=0.165.0,<1
+uvicorn>=0.54.0
